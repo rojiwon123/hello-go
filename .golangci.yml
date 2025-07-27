@@ -1,3 +1,5 @@
+version: 2
+
 run:
   timeout: 10m
   issues-exit-code: 2
@@ -5,15 +7,14 @@ run:
   build-tags: []
   allow-parallel-runners: true
 output:
-  formats:
-    - format: colored-line-number
+  format: colored-line-number
   print-issued-lines: true
   print-linter-name: true
   uniq-by-line: true
   sort-results: true
 linters-settings:
   errorlint:
-      asserts: false
+    asserts: false
   godot:
     scope: declarations
   gofmt:
@@ -146,11 +147,9 @@ linters-settings:
 linters:
   enable:
     - errcheck # checks unchecked errors
-    - gosimple # simplify code
     - govet # examines Go source code and reports suspicious constructs
     - ineffassign # detect unused assign
     - staticcheck # cover Go vet edge cases
-    - typecheck # type-checks Go code
     - unused # checks Go code for unused constants, variables, functions and types
     - bidichk # checks for dangerous unicode character sequences
     - bodyclose # checks whether HTTP response body is closed successfully
@@ -161,8 +160,6 @@ linters:
     - goconst # finds repeated strings that could be replaced by a constant
     - gocritic # provides diagnostics that check for bugs, performance and style issues
     - godot # check if comments end in a period
-    - gofmt # checks whether code was gofmt-ed
-    - goimports # fix imports, formats your code in the same style as gofmt
     - misspell # finds commonly misspelled English words in comments
     - noctx # finds sending http request without context.Context
     - predeclared # find code that shadows one of Go's predeclared identifiers

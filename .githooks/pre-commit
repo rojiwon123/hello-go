@@ -1,0 +1,4 @@
+#!/bin/sh
+
+task format
+SKIP_GOLANGCI_LINT=1 task lint

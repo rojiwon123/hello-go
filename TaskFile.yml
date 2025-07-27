@@ -1,0 +1,135 @@
+# https://taskfile.dev
+
+version: "3"
+
+vars:
+  APP: api
+# env:
+
+tasks:
+  default:
+    desc: default cmd
+    cmds:
+      - task: init
+      - task: setup:git
+      - task: setup:deps
+      - task: setup:tools
+
+  init:
+    desc: init project
+    cmds:
+      - brew bundle
+    sources:
+      - Brewfile
+    preconditions:
+      - sh: command -v brew
+        msg: "Please install Homebrew: https://brew.sh/"
+
+  setup:git:
+    desc: setup git config
+    cmds:
+      - git config core.hooksPath .githooks
+
+  setup:tools:
+    desc: setup tools
+    run: once
+    cmds:
+      - echo "Installing tools from tools.go"
+      - cat tools.go | grep _ | awk -F'"' '{print $2}' | xargs -tI % go install %
+    sources:
+      - tools.go
+      - go.mod
+      - .tool-versions
+
+  clean:tools:
+    desc: clean tools
+    cmds:
+      - echo "Cleaning tools from tools.go"
+      - cat tools.go | grep _ | awk -F'"' '{print $2}' | xargs -tI % go clean -i %
+    sources:
+      - tools.go
+      - go.mod
+
+  setup:deps:
+    desc: install dependencies
+    run: once
+    cmds:
+      - cmd: asdf plugin add golang https://github.com/kennyp/asdf-golang.git
+        ignore_error: true
+      - cmd: asdf plugin add golangci-lint https://github.com/hypnoglow/asdf-golangci-lint.git
+        ignore_error: true
+      - cmd: asdf plugin add sqldef
+        ignore_error: true
+      # 최신 gcloud cli는 최신버전의 python이 아닌 3.10.x를 이용해야 함
+      # https://issuetracker.google.com/issues/303280713?pli=1
+      - cmd: asdf plugin add python
+        ignore_error: true
+      - cmd: asdf plugin add gcloud
+        ignore_error: true
+      - asdf install
+      - asdf current
+    sources:
+      - .tool-versions
+
+  build:
+    desc: build application
+    cmds:
+      - CGO_ENABLED=0 GOOS=linux GOARCH={{.ARCH}} go build -a -installsuffix cgo -ldflags="-w -s" -o bin/{{.APP}}.linux.{{.ARCH}} cmd/*.go
+
+  build:all:
+    desc: build application for all platforms
+    cmds:
+      - CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -ldflags="-w -s" -o bin/{{.APP}}.linux.amd64 cmd/*.go
+      - CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -a -installsuffix cgo -ldflags="-w -s" -o bin/{{.APP}}.linux.arm64 cmd/*.go
+      - CGO_ENABLED=0 go build -a -installsuffix cgo -ldflags="-w -s" -o bin/{{.APP}} cmd/*.go
+
+  clean:build:
+    desc: clean build files
+    cmds:
+      - rm -rf bin
+
+  run:local:
+    desc: run application
+    dotenv: [".env"]
+    cmds:
+      - task: up:mysql
+      - task: up:redis
+      - go run -v -race cmd/*.go
+
+  format:
+    desc: foramt files
+    cmds:
+      - task: format:go
+
+  format:go:
+    desc: foramt go files
+    cmds:
+      - goimports -w .
+      - find . -not -path './tools.go' -not -name '*_mock.go' -name '*.go' -print0 | xargs -0 -P {{.NUM_CPUS}} -I {} goimports-reviser -use-cache -rm-unused -format {}
+      - go mod tidy
+    vars:
+      NUM_CPUS:
+        sh: command -v nproc >/dev/null && (nproc --all 2>/dev/null || nproc 2>/dev/null) || sysctl -n hw.ncpu
+    sources:
+      - "**/*.go"
+
+  lint:
+    desc: Lints files
+    cmds:
+      - task: lint:go
+
+  lint:go:
+    desc: Lints go files
+    deps:
+      - setup:tools
+    cmds:
+      - if [ "$SKIP_GOLANGCI_LINT" != "1" ]; then golangci-lint run ./...; fi
+      - find . -not -path './tools.go' -not -name '*_mock.go' -name '*.go' -print0 | xargs -0 -P {{.NUM_CPUS}} -I {} goimports-reviser -use-cache -rm-unused -format -list-diff -set-exit-status {}
+      - go mod verify
+    vars:
+      NUM_CPUS:
+        sh: command -v nproc >/dev/null && (nproc --all 2>/dev/null || nproc 2>/dev/null) || sysctl -n hw.ncpu
+    sources:
+      - .tool-versions
+      - .golangci.yml
+      - "**/*.go"

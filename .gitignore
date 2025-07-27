@@ -20,4 +20,4 @@ go.work.sum
 .env
 .env.*
 
-.task
+.task/

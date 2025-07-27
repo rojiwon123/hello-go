@@ -84,9 +84,7 @@ tasks:
   run:local:
     desc: run application
     dotenv: [".env"]
-    cmds:
-      - task: up:mysql
-      - task: up:redis
+    cmds:  
       - go run -v -race cmd/*.go
 
   format:

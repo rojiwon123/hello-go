@@ -523,15 +523,15 @@ func generateHTML(posts []models.BlogPost, blogStats map[string]int) error {
 	htmlContent := htmlBuffer.String()
 
 	// 로컬 파일로도 저장 (디버깅용)
-	file, err := os.Create("index.html")
-	if err != nil {
-		return err
-	}
-	defer file.Close()
+	// file, err := os.Create("index.html")
+	// if err != nil {
+	// 	return err
+	// }
+	// defer file.Close()
 
-	if _, err := file.WriteString(htmlContent); err != nil {
-		return err
-	}
+	// if _, err := file.WriteString(htmlContent); err != nil {
+	// 	return err
+	// }
 
 	// S3에 업로드
 	if err := uploadToS3(htmlContent); err != nil {

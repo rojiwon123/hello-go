@@ -1,0 +1,74 @@
+name: Deploy 🔖
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write # aws 인증에 필요
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  deployment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@main
+
+      - name: Configure AWS credentials 🔑
+        uses: aws-actions/configure-aws-credentials@main
+        with:
+          role-to-assume: ${{ vars.AWS_ASSUME_ROLE_ARN }}
+          aws-region: ap-northeast-2
+
+      - name: Login to ECR
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Setup ECR Repository
+        uses: deploy-actions/setup-ecr@v1
+        with:
+          RepositoryName: daily-tech-blog
+          # ImageTagMutability: IMMUTABLE
+
+      - name: Image Tag
+        id: image
+        run: echo "tag=${{ steps.ecr.outputs.registry }}/daily-tech-blog:latest" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Docker Build Builder Stage
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          target: builder
+          cache-from: type=gha, ref=main
+          cache-to: type=gha, ref=main, mode=max
+
+      - name: Docker Build Runner Stage
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ steps.image.outputs.tag }}
+          cache-from: type=gha, ref=main
+
+      - name: Push to ECR
+        id: target
+        run: |
+          docker push ${{ steps.image.outputs.tag }}
+          echo "digest=$(docker inspect --format '{{index .RepoDigests 0}}' ${{ steps.image.outputs.tag }})" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy Lambda
+        uses: deploy-actions/lambda-api@v1
+        with:
+          Name: daily-tech-blog
+          ImageUri: ${{ steps.target.outputs.digest }}
+          MemorySize: 1024
+          Timeout: 10
+          Environment: ${{ secrets.LAMBDA_ENV }}

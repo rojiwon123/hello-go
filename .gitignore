@@ -21,3 +21,5 @@ go.work.sum
 .env.*
 
 .task/
+
+index.html

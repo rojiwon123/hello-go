@@ -11,9 +11,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/aws/aws-sdk-go/service/lambda"
 
 	"hello-go/internal/crawlers"
 	"hello-go/internal/models"
@@ -539,7 +541,7 @@ func generateHTML(posts []models.BlogPost, blogStats map[string]int) error {
 	return nil
 }
 
-func main() {
+func handler(ctx context.Context, event events.CloudWatchEvent) {
 	log.Println("🚀 개발자들의 이야기 모음집 시작")
 	start := time.Now()
 
@@ -679,4 +681,8 @@ func main() {
 	log.Printf("🎉 완료! 총 소요시간: %v", duration)
 	log.Printf("📊 총 포스트 수: %d개", len(allPosts))
 	log.Printf("📁 생성된 파일: index.html")
+}
+
+func main() {
+	lambda.Start(handler)
 }

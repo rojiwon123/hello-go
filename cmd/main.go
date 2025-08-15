@@ -59,7 +59,6 @@ func uploadToS3(htmlContent string) error {
 		Key:         aws.String(S3_KEY_NAME),
 		Body:        bytes.NewReader(htmlBytes),
 		ContentType: aws.String("text/html"),
-		ACL:         "public-read", // 공개 읽기 권한
 	})
 
 	if err != nil {

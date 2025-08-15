@@ -31,12 +31,12 @@ jobs:
       - name: Setup ECR Repository
         uses: deploy-actions/setup-ecr@v1
         with:
-          RepositoryName: daily-tech-blog
+          RepositoryName: blog-aggregator
           # ImageTagMutability: IMMUTABLE
 
       - name: Image Tag
         id: image
-        run: echo "tag=${{ steps.ecr.outputs.registry }}/daily-tech-blog:latest" >> "$GITHUB_OUTPUT"
+        run: echo "tag=${{ steps.ecr.outputs.registry }}/blog-aggregator:${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -67,8 +67,10 @@ jobs:
       - name: Deploy Lambda
         uses: deploy-actions/lambda-api@v1
         with:
-          Name: daily-tech-blog
+          Name: blog-aggregator
           ImageUri: ${{ steps.target.outputs.digest }}
           MemorySize: 1024
-          Timeout: 10
-          Environment: ${{ secrets.LAMBDA_ENV }}
+          Timeout: 300
+          Environment: |
+            Variables:
+              S3_BUCKET: blog.tech

@@ -405,8 +405,6 @@ func (c *DaangnCrawler) crawlMainRSS() ([]models.BlogPost, error) {
 	return posts, nil
 }
 
-
-
 // extractThumbnail은 콘텐츠에서 썸네일 이미지를 추출합니다.
 func (c *DaangnCrawler) extractThumbnail(content, description string) string {
 	log.Printf("이미지 추출 시작 - content 길이: %d, description 길이: %d", len(content), len(description))

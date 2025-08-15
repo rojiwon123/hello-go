@@ -27,7 +27,7 @@ type TossPost struct {
 	Subtitle      string `json:"subtitle"`
 	Key           string `json:"key"`
 	CreatedTime   string `json:"createdTime"`
-		PublishedTime string `json:"publishedTime"`
+	PublishedTime string `json:"publishedTime"`
 	Category      string `json:"category"`
 	Categories    []struct {
 		Name string `json:"name"`
@@ -494,8 +494,6 @@ func (t *TossCrawler) parseDate(dateStr string) (time.Time, error) {
 
 	return time.Now(), fmt.Errorf("날짜 파싱 실패: %s", dateStr)
 }
-
-
 
 // extractThumbnailFromPage는 포스트 페이지에서 썸네일 이미지를 추출합니다.
 func (t *TossCrawler) extractThumbnailFromPage(postURL string) string {

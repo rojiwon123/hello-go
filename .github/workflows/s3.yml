@@ -1,0 +1,31 @@
+name: S3 🪣
+
+on:
+  workflow_dispatch:
+
+permissions:
+  id-token: write # aws 인증에 필요
+
+concurrency:
+  group: s3
+  cancel-in-progress: false
+
+jobs:
+  s3:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout 🛎️
+        uses: actions/checkout@main
+
+      - name: Configure AWS credentials 🔑
+        uses: aws-actions/configure-aws-credentials@main
+        with:
+          role-to-assume: ${{ vars.AWS_ASSUME_ROLE_ARN }}
+          aws-region: ap-northeast-2
+
+      - name: Setup Page
+        uses: deploy-actions/s3-spa@v1
+        with:
+          BucketName: blog.tech
+          

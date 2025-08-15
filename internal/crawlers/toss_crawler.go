@@ -17,7 +17,8 @@ import (
 
 // TossCrawler는 토스 기술 블로그를 크롤링합니다.
 type TossCrawler struct {
-	client *http.Client
+	client     *http.Client
+	filterDate time.Time
 }
 
 // Toss API 응답 구조체
@@ -49,11 +50,12 @@ type TossAPIResponse struct {
 }
 
 // NewTossCrawler는 새로운 TossCrawler 인스턴스를 생성합니다.
-func NewTossCrawler() *TossCrawler {
+func NewTossCrawler(filterDate time.Time) *TossCrawler {
 	return &TossCrawler{
 		client: &http.Client{
 			Timeout: 60 * time.Second,
 		},
+		filterDate: filterDate,
 	}
 }
 
@@ -84,6 +86,10 @@ func (t *TossCrawler) Crawl() ([]models.BlogPost, error) {
 	maxConcurrent := 5
 	semaphore := make(chan struct{}, maxConcurrent)
 
+	// FilterDate를 지난 글이 발견된 페이지 번호를 추적
+	var cutoffPage int32 = 0
+	var cutoffMutex sync.RWMutex
+
 	// 첫 번째 페이지로 총 페이지 수 확인
 	firstPagePosts, err := t.crawlPage("https://toss.tech/?page=1")
 	if err != nil {
@@ -96,6 +102,16 @@ func (t *TossCrawler) Crawl() ([]models.BlogPost, error) {
 	// 나머지 페이지들을 병렬로 크롤링
 	maxPages := 50 // 최대 50페이지까지 시도
 	for page := 2; page <= maxPages; page++ {
+		// cutoffPage가 설정되면 더 이상 고루틴 생성하지 않음
+		cutoffMutex.RLock()
+		currentCutoff := cutoffPage
+		cutoffMutex.RUnlock()
+
+		if currentCutoff > 0 && page > int(currentCutoff) {
+			log.Printf("페이지 %d 이후 크롤링 중단 (FilterDate 기준 페이지 %d)", page, currentCutoff)
+			break // 루프 자체를 종료
+		}
+
 		wg.Add(1)
 		go func(pageNum int) {
 			defer wg.Done()
@@ -118,6 +134,19 @@ func (t *TossCrawler) Crawl() ([]models.BlogPost, error) {
 				log.Printf("페이지 %d에서 포스트를 찾을 수 없음", pageNum)
 				resultChan <- pageResult{page: pageNum, posts: nil, err: nil}
 				return
+			}
+
+			// FilterDate를 지난 글이 있는지 확인하고 cutoffPage 업데이트
+			for _, post := range pagePosts {
+				if post.PublishedAt.Before(t.filterDate) {
+					cutoffMutex.Lock()
+					if cutoffPage == 0 || pageNum < int(cutoffPage) {
+						cutoffPage = int32(pageNum)
+						log.Printf("FilterDate 기준 페이지 설정: %d (포스트: %s, 날짜: %v)", pageNum, post.Title, post.PublishedAt)
+					}
+					cutoffMutex.Unlock()
+					break
+				}
 			}
 
 			log.Printf("페이지 %d 완료: %d개 포스트", pageNum, len(pagePosts))

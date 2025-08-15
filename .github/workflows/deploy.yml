@@ -74,6 +74,7 @@ jobs:
           Environment: |
             Variables:
               S3_BUCKET: blog.tech
+              FILTER_DATE: 2025-01-01
           Policies: |
             Version: "2012-10-17"
             Statement:

@@ -5,6 +5,7 @@ import (
 	"context"
 	"log"
 	"os"
+	"time"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -66,11 +67,16 @@ func uploadToS3(htmlContent string) {
 }
 
 func main() {
+	filterDate, err := time.Parse("2006-01-02", getFilterDate())
+	if err != nil {
+		log.Fatalf("날짜 파싱 실패: %v", err)
+	}
+
 	lambda.Start(func() {
 		internal.Crawl(
 			getFilterDate(),
 			uploadToS3,
-			crawlers.NewTossCrawler(),
+			crawlers.NewTossCrawler(filterDate),
 			crawlers.NewDaangnCrawler(),
 			crawlers.NewDanminCrawler(),
 			crawlers.NewNaverCrawler(),

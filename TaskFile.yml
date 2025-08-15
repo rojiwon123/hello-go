@@ -85,7 +85,7 @@ tasks:
     desc: run application
     dotenv: [".env"]
     cmds:  
-      - go run -v -race cmd/*.go
+      - go run -v -race cmd/local/main.go
 
   format:
     desc: foramt files

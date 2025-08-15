@@ -1,76 +1,19 @@
-package main
+package internal
 
 import (
 	"bytes"
-	"context"
-	"html/template"
 	"log"
-	"os"
 	"sort"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
-	"github.com/aws/aws-lambda-go/events"
-	"github.com/aws/aws-lambda-go/lambda"
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
-
-	"hello-go/internal/crawlers"
 	"hello-go/internal/models"
 )
 
-// 전역 상수: 이 날짜 이후의 포스트만 수집
-const FILTER_DATE = "2025-01-01"
-
-// S3 설정
-const S3_KEY_NAME = "index.html"
-
-// getS3BucketName은 환경변수에서 S3 버킷 이름을 가져옵니다.
-func getS3BucketName() string {
-	bucketName := os.Getenv("S3_BUCKET")
-	if bucketName == "" {
-		log.Fatal("S3_BUCKET 환경변수가 설정되지 않았습니다.")
-	}
-	return bucketName
-}
-
-// uploadToS3는 HTML 파일을 S3에 업로드합니다.
-func uploadToS3(htmlContent string) error {
-	// AWS 설정 로드
-	cfg, err := config.LoadDefaultConfig(context.TODO())
-	if err != nil {
-		return err
-	}
-
-	// S3 클라이언트 생성
-	s3Client := s3.NewFromConfig(cfg)
-
-	// HTML 내용을 바이트로 변환
-	htmlBytes := []byte(htmlContent)
-
-	// S3 버킷 이름 가져오기
-	bucketName := getS3BucketName()
-
-	// S3에 업로드
-	_, err = s3Client.PutObject(context.TODO(), &s3.PutObjectInput{
-		Bucket:      aws.String(bucketName),
-		Key:         aws.String(S3_KEY_NAME),
-		Body:        bytes.NewReader(htmlBytes),
-		ContentType: aws.String("text/html"),
-	})
-
-	if err != nil {
-		return err
-	}
-
-	log.Printf("✅ HTML 파일이 S3에 업로드되었습니다: s3://%s/%s", bucketName, S3_KEY_NAME)
-	return nil
-}
-
 // generateHTML은 HTML을 생성하고 S3에 업로드합니다.
-func generateHTML(posts []models.BlogPost, blogStats map[string]int) error {
+func generateHTML(posts []models.BlogPost, blogStats map[string]int) (string, error) {
 	// 포스트를 최신순으로 정렬 (내림차순)
 	sort.Slice(posts, func(i, j int) bool {
 		return posts[i].PublishedAt.After(posts[j].PublishedAt)
@@ -96,8 +39,8 @@ func generateHTML(posts []models.BlogPost, blogStats map[string]int) error {
 	}
 	sort.Strings(blogList)
 
-	// 기본 이미지 (SVG)
-	defaultImage := `data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRjNGNEY2Ii8+CjxwYXRoIGQ9Ik0xNTAgMTAwTDE3MCAxMjBMMTUwIDE0MEwxMzAgMTIwTDE1MCAxMDBaIiBmaWxsPSIjN0MzQTVGIi8+Cjx0ZXh0IHg9IjE1MCIgeT0iMTgwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjN0MzQTVGIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiPuiJvuacn+WbvueJhzwvdGV4dD4KPC9zdmc+`
+	// 기본 이미지 (흰색 SVG)
+	defaultImage := `data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgdmlld0JveD0iMCAwIDMwMCAyMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSIzMDAiIGhlaWdodD0iMjAwIiBmaWxsPSIjRkZGRkZGIi8+Cjwvc3ZnPg==`
 
 	// 이미지가 없는 포스트에 기본 이미지 설정
 	for i := range posts {
@@ -402,6 +345,10 @@ func generateHTML(posts []models.BlogPost, blogStats map[string]int) error {
         </div>
 
         <div class="stats">
+            <div class="stat-item">
+                <span class="stat-number">{{len .Posts}}</span>
+                <span class="stat-label">전체</span>
+            </div>
             {{range $blog, $count := .BlogStats}}
             <div class="stat-item">
                 <span class="stat-number">{{$count}}</span>
@@ -510,45 +457,24 @@ func generateHTML(posts []models.BlogPost, blogStats map[string]int) error {
 
 	tmpl, err := template.New("blog").Parse(htmlTemplate)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	// HTML 내용을 문자열로 생성
 	var htmlBuffer bytes.Buffer
 	if err := tmpl.Execute(&htmlBuffer, data); err != nil {
-		return err
+		return "", err
 	}
 
 	htmlContent := htmlBuffer.String()
 
-	// 로컬 파일로도 저장 (디버깅용)
-	// file, err := os.Create("index.html")
-	// if err != nil {
-	// 	return err
-	// }
-	// defer file.Close()
+	return htmlContent, nil
 
-	// if _, err := file.WriteString(htmlContent); err != nil {
-	// 	return err
-	// }
-
-	// S3에 업로드
-	if err := uploadToS3(htmlContent); err != nil {
-		return err
-	}
-
-	return nil
 }
 
-func handler(ctx context.Context, event events.CloudWatchEvent) {
+func Crawl(filterDate string, handler func(html string), blogCrawlers ...models.BlogCrawler) {
 	log.Println("🚀 개발자들의 이야기 모음집 시작")
 	start := time.Now()
-
-	// 모든 크롤러 생성
-	tossCrawler := crawlers.NewTossCrawler()
-	daangnCrawler := crawlers.NewDaangnCrawler()
-	naverCrawler := crawlers.NewNaverCrawler()
-	danminCrawler := crawlers.NewDanminCrawler()
 
 	// 병렬 크롤링을 위한 구조체
 	type crawlerResult struct {
@@ -558,44 +484,20 @@ func handler(ctx context.Context, event events.CloudWatchEvent) {
 	}
 
 	// 결과를 저장할 채널
-	resultChan := make(chan crawlerResult, 4)
+	resultChan := make(chan crawlerResult, len(blogCrawlers))
 	var wg sync.WaitGroup
 
-	// Toss 블로그 크롤링 (고루틴)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		log.Println("📡 Toss 블로그 크롤링 시작...")
-		posts, err := tossCrawler.Crawl()
-		resultChan <- crawlerResult{posts: posts, err: err, name: "Toss"}
-	}()
-
-	// Daangn 블로그 크롤링 (고루틴)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		log.Println("📡 Daangn 블로그 크롤링 시작...")
-		posts, err := daangnCrawler.Crawl()
-		resultChan <- crawlerResult{posts: posts, err: err, name: "Daangn"}
-	}()
-
-	// Naver D2 블로그 크롤링 (고루틴)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		log.Println("📡 Naver D2 블로그 크롤링 시작...")
-		posts, err := naverCrawler.Crawl()
-		resultChan <- crawlerResult{posts: posts, err: err, name: "Naver D2"}
-	}()
-
-	// 단민 블로그 크롤링 (고루틴)
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		log.Println("📡 단민 블로그 크롤링 시작...")
-		posts, err := danminCrawler.Crawl()
-		resultChan <- crawlerResult{posts: posts, err: err, name: "단민"}
-	}()
+	// 각 크롤러를 병렬로 실행
+	for _, crawler := range blogCrawlers {
+		wg.Add(1)
+		go func(c models.BlogCrawler) {
+			defer wg.Done()
+			source := c.GetSource()
+			log.Printf("📡 %s 블로그 크롤링 시작...", source.Name)
+			posts, err := c.Crawl()
+			resultChan <- crawlerResult{posts: posts, err: err, name: source.Name}
+		}(crawler)
+	}
 
 	// 모든 고루틴이 완료될 때까지 대기
 	go func() {
@@ -626,7 +528,7 @@ func handler(ctx context.Context, event events.CloudWatchEvent) {
 	}
 
 	// 필터 날짜 파싱
-	filterTime, err := time.Parse("2006-01-02", FILTER_DATE)
+	filterTime, err := time.Parse("2006-01-02", filterDate)
 	if err != nil {
 		log.Fatalf("필터 날짜 파싱 실패: %v", err)
 	}
@@ -666,22 +568,20 @@ func handler(ctx context.Context, event events.CloudWatchEvent) {
 
 	log.Printf("✅ 전체 크롤링 완료: %d개 포스트 (필터링 후: %d개, 중복 제거 후: %d개)",
 		len(allPosts), len(filteredPosts), len(uniquePosts))
-	log.Printf("📅 필터 기준: %s 이후", FILTER_DATE)
+	log.Printf("📅 필터 기준: %s 이후", filterDate)
 	for blog, count := range blogStats {
 		log.Printf("📊 %s: %d개", blog, count)
 	}
 
-	// HTML 파일 생성 및 S3 업로드
-	if err := generateHTML(uniquePosts, blogStats); err != nil {
-		log.Fatalf("HTML 생성 및 S3 업로드 실패: %v", err)
+	html, err := generateHTML(uniquePosts, blogStats)
+	if err != nil {
+		log.Fatalf("HTML 생성 실패: %v", err)
 	}
+
+	handler(html)
 
 	duration := time.Since(start)
 	log.Printf("🎉 완료! 총 소요시간: %v", duration)
 	log.Printf("📊 총 포스트 수: %d개", len(allPosts))
 	log.Printf("📁 생성된 파일: index.html")
-}
-
-func main() {
-	lambda.Start(handler)
 }

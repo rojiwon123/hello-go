@@ -1,7 +1,6 @@
 package crawlers
 
 import (
-	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"log"
@@ -406,71 +405,7 @@ func (c *DaangnCrawler) crawlMainRSS() ([]models.BlogPost, error) {
 	return posts, nil
 }
 
-// crawlApolloState는 Medium의 Apollo State에서 포스트 정보를 추출합니다.
-func (c *DaangnCrawler) crawlApolloState() ([]models.BlogPost, error) {
-	resp, err := c.client.Get("https://medium.com/daangn")
-	if err != nil {
-		return nil, fmt.Errorf("메인 페이지 요청 실패: %w", err)
-	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("메인 페이지 응답 오류: %d", resp.StatusCode)
-	}
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("HTML 파싱 실패: %w", err)
-	}
-
-	// Apollo State 스크립트 찾기
-	var apolloStateStr string
-	doc.Find("script").Each(func(i int, s *goquery.Selection) {
-		scriptContent := s.Text()
-		if strings.Contains(scriptContent, "window.__APOLLO_STATE__") {
-			// window.__APOLLO_STATE__ = {...} 형태에서 JSON 부분 추출
-			re := regexp.MustCompile(`window\.__APOLLO_STATE__\s*=\s*({.*})`)
-			matches := re.FindStringSubmatch(scriptContent)
-			if len(matches) > 1 {
-				apolloStateStr = matches[1]
-			}
-		}
-	})
-
-	if apolloStateStr == "" {
-		return nil, fmt.Errorf("Apollo State를 찾을 수 없습니다")
-	}
-
-	// JSON 파싱
-	var apolloState map[string]interface{}
-	if err := json.Unmarshal([]byte(apolloStateStr), &apolloState); err != nil {
-		return nil, fmt.Errorf("Apollo State JSON 파싱 실패: %w", err)
-	}
-
-	var posts []models.BlogPost
-
-	// Post 객체들 찾기
-	for key := range apolloState {
-		if strings.HasPrefix(key, "Post:") {
-			postID := strings.TrimPrefix(key, "Post:")
-			postURL := fmt.Sprintf("https://medium.com/daangn/%s", postID)
-
-			// 포스트 상세 정보 가져오기
-			post, err := c.getPostDetails(postID, postURL)
-			if err != nil {
-				log.Printf("포스트 %s 상세 정보 가져오기 실패: %v", postID, err)
-				continue
-			}
-
-			if post.Title != "" {
-				posts = append(posts, post)
-				log.Printf("Apollo State 포스트 발견: %s", post.Title)
-			}
-		}
-	}
-
-	return posts, nil
-}
 
 // extractThumbnail은 콘텐츠에서 썸네일 이미지를 추출합니다.
 func (c *DaangnCrawler) extractThumbnail(content, description string) string {

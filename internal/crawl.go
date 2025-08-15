@@ -469,7 +469,6 @@ func generateHTML(posts []models.BlogPost, blogStats map[string]int) (string, er
 	htmlContent := htmlBuffer.String()
 
 	return htmlContent, nil
-
 }
 
 func Crawl(filterDate string, handler func(html string), blogCrawlers ...models.BlogCrawler) {

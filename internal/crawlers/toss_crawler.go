@@ -27,7 +27,7 @@ type TossPost struct {
 	Subtitle      string `json:"subtitle"`
 	Key           string `json:"key"`
 	CreatedTime   string `json:"createdTime"`
-	PublishedTime string `json:"publishedTime"`
+		PublishedTime string `json:"publishedTime"`
 	Category      string `json:"category"`
 	Categories    []struct {
 		Name string `json:"name"`
@@ -495,104 +495,7 @@ func (t *TossCrawler) parseDate(dateStr string) (time.Time, error) {
 	return time.Now(), fmt.Errorf("날짜 파싱 실패: %s", dateStr)
 }
 
-// resolveThumbnail는 포스트 상세 페이지에서 og:image를 추출합니다.
-func (t *TossCrawler) resolveThumbnail(postURL string) string {
-	resp, err := t.client.Get(postURL)
-	if err != nil {
-		return ""
-	}
-	defer resp.Body.Close()
 
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		return ""
-	}
-
-	var imageURL string
-	doc.Find("meta").Each(func(i int, s *goquery.Selection) {
-		if prop, _ := s.Attr("property"); prop == "og:image" {
-			if content, ok := s.Attr("content"); ok {
-				imageURL = strings.TrimSpace(content)
-			}
-		}
-	})
-
-	return imageURL
-}
-
-// extractDateFromPage는 실제 블로그 페이지에서 날짜를 추출합니다.
-func (t *TossCrawler) extractDateFromPage(url string) time.Time {
-	resp, err := t.client.Get(url)
-	if err != nil {
-		log.Printf("토스 페이지 날짜 추출 실패 (요청): %v", err)
-		return time.Time{}
-	}
-	defer resp.Body.Close()
-
-	doc, err := goquery.NewDocumentFromReader(resp.Body)
-	if err != nil {
-		log.Printf("토스 페이지 날짜 추출 실패 (파싱): %v", err)
-		return time.Time{}
-	}
-
-	// 메타 태그에서 날짜 확인 (우선순위 1)
-	doc.Find("meta").Each(func(i int, s *goquery.Selection) {
-		if prop, _ := s.Attr("property"); prop == "article:published_time" {
-			if content, ok := s.Attr("content"); ok {
-				if parsedTime, err := t.parseDate(content); err == nil {
-					log.Printf("토스 메타 태그에서 날짜 발견: %v", parsedTime)
-					return
-				}
-			}
-		}
-	})
-
-	// 다양한 날짜 선택자 시도 (우선순위 2)
-	dateSelectors := []string{
-		".date", ".published", ".post-date", ".article-date", ".publish-date",
-		".created", ".created-date", ".time", ".timestamp",
-		"[class*='date']", "[class*='time']", "[class*='published']",
-		"time[datetime]", "time", "span[datetime]",
-		".article-info .date", ".post-info .date", ".meta .date",
-		".entry-date", ".post-meta .date", ".article-meta .date",
-	}
-
-	for _, selector := range dateSelectors {
-		doc.Find(selector).Each(func(i int, s *goquery.Selection) {
-			// datetime 속성 확인
-			if datetime, exists := s.Attr("datetime"); exists && datetime != "" {
-				if parsedTime, err := t.parseDate(datetime); err == nil {
-					log.Printf("토스 datetime 속성에서 날짜 발견: %v", parsedTime)
-					return
-				}
-			}
-
-			// 텍스트에서 날짜 추출
-			text := strings.TrimSpace(s.Text())
-			if text != "" {
-				// 한국어 날짜 패턴 (예: "2025년 6월 25일", "2025.06.25")
-				datePatterns := []*regexp.Regexp{
-					regexp.MustCompile(`(\d{4})년\s*(\d{1,2})월\s*(\d{1,2})일`),
-					regexp.MustCompile(`(\d{4})\.(\d{1,2})\.(\d{1,2})`),
-					regexp.MustCompile(`(\d{4})-(\d{1,2})-(\d{1,2})`),
-					regexp.MustCompile(`(\d{4})/(\d{1,2})/(\d{1,2})`),
-				}
-
-				for _, pattern := range datePatterns {
-					if matches := pattern.FindStringSubmatch(text); len(matches) == 4 {
-						dateStr := fmt.Sprintf("%s-%s-%s", matches[1], matches[2], matches[3])
-						if parsedTime, err := time.Parse("2006-1-2", dateStr); err == nil {
-							log.Printf("토스 텍스트에서 날짜 발견: %s -> %v", text, parsedTime)
-							return
-						}
-					}
-				}
-			}
-		})
-	}
-
-	return time.Time{}
-}
 
 // extractThumbnailFromPage는 포스트 페이지에서 썸네일 이미지를 추출합니다.
 func (t *TossCrawler) extractThumbnailFromPage(postURL string) string {

@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -48,11 +49,20 @@ func (c *DanminCrawler) Crawl() ([]models.BlogPost, error) {
 
 	allPosts = append(allPosts, posts...)
 
-	// 중복 제거
-	uniquePosts := c.removeDuplicates(allPosts)
+	// 중복 제거 (URL 기준)
+	seen := make(map[string]bool)
+	var uniquePosts []models.BlogPost
+	for _, post := range allPosts {
+		if !seen[post.URL] {
+			seen[post.URL] = true
+			uniquePosts = append(uniquePosts, post)
+		}
+	}
 
 	// 최신순으로 정렬
-	c.sortByDate(uniquePosts)
+	sort.Slice(uniquePosts, func(i, j int) bool {
+		return uniquePosts[i].PublishedAt.After(uniquePosts[j].PublishedAt)
+	})
 
 	log.Printf("개발자 단민 블로그 크롤링 완료: 총 %d개 포스트 발견", len(uniquePosts))
 	return uniquePosts, nil
@@ -242,30 +252,4 @@ func (c *DanminCrawler) determineCategory(title, summary, url string) string {
 	}
 
 	return "기타"
-}
-
-// removeDuplicates는 중복된 포스트를 제거합니다.
-func (c *DanminCrawler) removeDuplicates(posts []models.BlogPost) []models.BlogPost {
-	seen := make(map[string]bool)
-	var unique []models.BlogPost
-
-	for _, post := range posts {
-		if !seen[post.URL] {
-			seen[post.URL] = true
-			unique = append(unique, post)
-		}
-	}
-
-	return unique
-}
-
-// sortByDate는 포스트를 날짜순으로 정렬합니다 (최신순).
-func (c *DanminCrawler) sortByDate(posts []models.BlogPost) {
-	for i := 0; i < len(posts)-1; i++ {
-		for j := i + 1; j < len(posts); j++ {
-			if posts[i].PublishedAt.Before(posts[j].PublishedAt) {
-				posts[i], posts[j] = posts[j], posts[i]
-			}
-		}
-	}
 }

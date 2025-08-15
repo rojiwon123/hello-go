@@ -3,17 +3,16 @@ package crawlers
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
-	"hello-go/internal/models"
-
-	"io"
-	"regexp"
-
 	"github.com/PuerkitoBio/goquery"
+
+	"hello-go/internal/models"
 )
 
 // min 함수는 두 정수 중 작은 값을 반환합니다.

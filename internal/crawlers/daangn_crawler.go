@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"hello-go/internal/models"
-
 	"github.com/PuerkitoBio/goquery"
+
+	"hello-go/internal/models"
 )
 
 // RSS 구조체 정의

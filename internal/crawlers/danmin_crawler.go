@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"hello-go/internal/models"
-
 	"github.com/PuerkitoBio/goquery"
+
+	"hello-go/internal/models"
 )
 
 // DanminCrawler는 개발자 단민 블로그를 크롤링합니다.

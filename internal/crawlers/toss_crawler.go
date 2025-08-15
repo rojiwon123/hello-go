@@ -7,13 +7,12 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
-	"hello-go/internal/models"
-
-	"sync"
-
 	"github.com/PuerkitoBio/goquery"
+
+	"hello-go/internal/models"
 )
 
 // TossCrawler는 토스 기술 블로그를 크롤링합니다.

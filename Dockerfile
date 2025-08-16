@@ -14,13 +14,13 @@ RUN go mod download
 COPY . .
 
 # Build the application for Linux/AMD64 (Lambda requirement)
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -tags lambda -ldflags="-w -s" -o bootstrap cmd/lambda/main.go
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-w -s" -o bootstrap cmd/lambda/main.go
 
 # Runtime stage
-FROM public.ecr.aws/lambda/go:1
+FROM public.ecr.aws/lambda/provided:al2-86x_64
 
 # Copy the binary from builder stage
-COPY --from=builder /app/bootstrap ${LAMBDA_TASK_ROOT}
+COPY --from=builder /app/bootstrap ${LAMBDA_RUNTIME_DIR}
 
 # Set the CMD to your handler
 CMD [ "bootstrap" ]

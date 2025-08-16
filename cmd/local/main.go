@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"os"
-	"time"
 
 	"hello-go/internal"
 	"hello-go/internal/crawlers"
@@ -22,17 +21,17 @@ func writeFile(html string) {
 }
 
 func main() {
-	filterDate, err := time.Parse("2006-01-02", "2025-01-01")
-	if err != nil {
-		log.Fatalf("날짜 파싱 실패: %v", err)
-	}
+	// filterDate, err := time.Parse("2006-01-02", "2025-01-01")
+	// if err != nil {
+	// 	log.Fatalf("날짜 파싱 실패: %v", err)
+	// }
 
 	internal.Crawl(
 		"2025-01-01",
 		writeFile,
-		crawlers.NewTossCrawler(filterDate),
-		crawlers.NewDaangnCrawler(),
+		//crawlers.NewTossCrawler(filterDate),
+		//crawlers.NewDaangnCrawler(),
 		crawlers.NewDanminCrawler(),
-		crawlers.NewNaverCrawler(),
+		//crawlers.NewNaverCrawler(),
 	)
 }

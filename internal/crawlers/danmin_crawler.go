@@ -228,27 +228,56 @@ func (c *DanminCrawler) crawlPostDetail(url, title string) (models.BlogPost, err
 		}
 	})
 
-	// 카테고리 자동 분류
-	post.Category = c.determineCategory(post.Title, post.Summary, post.URL)
+	// 카테고리 정보 찾기 (다양한 HTML 요소에서 시도)
+	post.Category = c.findCategoryFromHTML(doc)
+
+	// 카테고리를 찾지 못한 경우 기본값 설정
+	if post.Category == "" {
+		post.Category = "기타"
+	}
 
 	return post, nil
 }
 
-// determineCategory는 제목과 요약을 기반으로 카테고리를 결정합니다.
-func (c *DanminCrawler) determineCategory(title, summary, url string) string {
-	text := strings.ToLower(title + " " + summary)
+// findCategoryFromHTML은 HTML에서 카테고리 정보를 찾습니다.
+func (c *DanminCrawler) findCategoryFromHTML(doc *goquery.Document) string {
+	// 정확히 일치하는 카테고리 텍스트 찾기
+	categories := []string{"Dev", "Experience", "회고", "인턴"}
+	var foundCategory string
 
-	if strings.Contains(text, "react") || strings.Contains(text, "next.js") || strings.Contains(text, "frontend") || strings.Contains(text, "ui") || strings.Contains(text, "component") {
-		return "프론트엔드"
+	for _, cat := range categories {
+		// 정확히 일치하는 텍스트를 가진 요소 찾기
+		doc.Find("*:contains('" + cat + "')").Each(func(i int, s *goquery.Selection) {
+			text := strings.TrimSpace(s.Text())
+			if text == cat {
+				// 카테고리 텍스트를 개발/경험으로 매핑
+				mappedCategory := c.mapCategoryText(cat)
+				if mappedCategory != "" {
+					log.Printf("HTML에서 카테고리 발견: %s -> %s", cat, mappedCategory)
+					// 결과를 저장하고 함수 종료
+					foundCategory = mappedCategory
+				}
+			}
+		})
 	}
-	if strings.Contains(text, "인턴") || strings.Contains(text, "회고") || strings.Contains(text, "경험") {
+
+	return foundCategory
+}
+
+// mapCategoryText는 발견된 카테고리 텍스트를 개발/경험으로 매핑합니다.
+func (c *DanminCrawler) mapCategoryText(categoryText string) string {
+	text := strings.ToLower(strings.TrimSpace(categoryText))
+
+	// 경험 관련 카테고리
+	if strings.Contains(text, "experience") || strings.Contains(text, "회고") ||
+		strings.Contains(text, "인턴") || strings.Contains(text, "경험") {
 		return "경험"
 	}
-	if strings.Contains(text, "개발") || strings.Contains(text, "coding") || strings.Contains(text, "프로그래밍") {
+
+	// 개발 관련 카테고리
+	if strings.Contains(text, "dev") || strings.Contains(text, "개발") ||
+		strings.Contains(text, "기술") || strings.Contains(text, "코딩") {
 		return "개발"
-	}
-	if strings.Contains(text, "ci") || strings.Contains(text, "cd") || strings.Contains(text, "deploy") || strings.Contains(text, "배포") {
-		return "DevOps"
 	}
 
 	return "기타"

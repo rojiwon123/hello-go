@@ -88,13 +88,9 @@ tasks:
       - go run -v -race cmd/local/main.go
 
   format:
-    desc: foramt files
+    desc: format all Go files
     cmds:
-      - task: format:go
-
-  format:go:
-    desc: foramt go files
-    cmds:
+      - echo "Formatting all Go files..."
       - goimports -w .
       - find . -not -path './tools.go' -not -name '*_mock.go' -name '*.go' -print0 | xargs -0 -P {{.NUM_CPUS}} -I {} {{.GOBIN}}/goimports-reviser -use-cache -rm-unused -format {}
       - go mod tidy
@@ -103,16 +99,28 @@ tasks:
         sh: command -v nproc >/dev/null && (nproc --all 2>/dev/null || nproc 2>/dev/null) || sysctl -n hw.ncpu
       GOBIN:
         sh: go env GOBIN
-    sources:
-      - "**/*.go"
+
+  format:staged:
+    desc: format staged Go files
+    cmds:
+      - |
+        STAGED_FILES=$(git diff --name-only --cached | grep '\.go$' | grep -v 'tools\.go' | grep -v '_mock\.go' || true)
+        if [ -n "$STAGED_FILES" ]; then
+          echo "Formatting staged Go files: $STAGED_FILES"
+          echo "$STAGED_FILES" | xargs -I {} goimports -w {}
+          echo "$STAGED_FILES" | xargs -I {} {{.GOBIN}}/goimports-reviser -use-cache -rm-unused -format {}
+        else
+          echo "No staged Go files to format"
+        fi
+        go mod tidy
+    vars:
+      GOBIN:
+        sh: go env GOBIN
+
+
 
   lint:
-    desc: Lints files
-    cmds:
-      - task: lint:go
-
-  lint:go:
-    desc: Lints go files
+    desc: Lints all Go files
     deps:
       - setup:tools
     cmds:
@@ -128,3 +136,24 @@ tasks:
       - .tool-versions
       - .golangci.yml
       - "**/*.go"
+
+  lint:staged:
+    desc: Lints staged Go files only
+    deps:
+      - setup:tools
+    cmds:
+      - |
+        STAGED_FILES=$(git diff --name-only --cached | grep '\.go$' | grep -v 'tools\.go' | grep -v '_mock\.go' || true)
+        if [ -n "$STAGED_FILES" ]; then
+          echo "Linting staged Go files: $STAGED_FILES"
+          if [ "$SKIP_GOLANGCI_LINT" != "1" ]; then
+            echo "$STAGED_FILES" | xargs -I {} golangci-lint run {}
+          fi
+          echo "$STAGED_FILES" | xargs -I {} {{.GOBIN}}/goimports-reviser -use-cache -rm-unused -format -list-diff -set-exit-status {}
+        else
+          echo "No staged Go files to lint"
+        fi
+        go mod verify
+    vars:
+      GOBIN:
+        sh: go env GOBIN

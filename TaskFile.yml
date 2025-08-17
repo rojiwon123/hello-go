@@ -102,17 +102,10 @@ tasks:
 
   format:staged:
     desc: format staged Go files
+    silent: true
     cmds:
-      - |
-        STAGED_FILES=$(git diff --name-only --cached | grep '\.go$' | grep -v 'tools\.go' | grep -v '_mock\.go' || true)
-        if [ -n "$STAGED_FILES" ]; then
-          echo "Formatting staged Go files: $STAGED_FILES"
-          echo "$STAGED_FILES" | xargs -I {} goimports -w {}
-          echo "$STAGED_FILES" | xargs -I {} {{.GOBIN}}/goimports-reviser -use-cache -rm-unused -format {}
-        else
-          echo "No staged Go files to format"
-        fi
-        go mod tidy
+      - sh -c 'STAGED_FILES=$(git diff --name-only --cached | grep "\.go$" | grep -v "tools\.go" | grep -v "_mock\.go" || true); if [ -n "$STAGED_FILES" ]; then echo "$STAGED_FILES" | xargs -I {} goimports -w {}; echo "$STAGED_FILES" | xargs -I {} {{.GOBIN}}/goimports-reviser -use-cache -rm-unused -format {}; fi'
+      - go mod tidy
     vars:
       GOBIN:
         sh: go env GOBIN
@@ -139,21 +132,12 @@ tasks:
 
   lint:staged:
     desc: Lints staged Go files only
+    silent: true
     deps:
       - setup:tools
     cmds:
-      - |
-        STAGED_FILES=$(git diff --name-only --cached | grep '\.go$' | grep -v 'tools\.go' | grep -v '_mock\.go' || true)
-        if [ -n "$STAGED_FILES" ]; then
-          echo "Linting staged Go files: $STAGED_FILES"
-          if [ "$SKIP_GOLANGCI_LINT" != "1" ]; then
-            echo "$STAGED_FILES" | xargs -I {} golangci-lint run {}
-          fi
-          echo "$STAGED_FILES" | xargs -I {} {{.GOBIN}}/goimports-reviser -use-cache -rm-unused -format -list-diff -set-exit-status {}
-        else
-          echo "No staged Go files to lint"
-        fi
-        go mod verify
+      - sh -c 'STAGED_FILES=$(git diff --name-only --cached | grep "\.go$" | grep -v "tools\.go" | grep -v "_mock\.go" || true); if [ -n "$STAGED_FILES" ]; then if [ "$SKIP_GOLANGCI_LINT" != "1" ]; then echo "$STAGED_FILES" | xargs -I {} golangci-lint run {}; fi; echo "$STAGED_FILES" | xargs -I {} {{.GOBIN}}/goimports-reviser -use-cache -rm-unused -format -list-diff -set-exit-status {}; fi'
+      - go mod verify
     vars:
       GOBIN:
         sh: go env GOBIN
